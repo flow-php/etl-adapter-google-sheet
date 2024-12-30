@@ -6,10 +6,10 @@ namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit;
 
 use Flow\ETL\Adapter\GoogleSheet\{Columns, SheetRange};
 use Flow\ETL\Exception\InvalidArgumentException;
+use Flow\ETL\Tests\FlowTestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 
-final class SheetRangeTest extends TestCase
+final class SheetRangeTest extends FlowTestCase
 {
     public static function example_string_ranges() : \Generator
     {

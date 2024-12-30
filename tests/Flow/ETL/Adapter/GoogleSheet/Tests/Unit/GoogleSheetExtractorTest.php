@@ -7,12 +7,11 @@ namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit;
 use function Flow\ETL\Adapter\GoogleSheet\from_google_sheet_columns;
 use function Flow\ETL\DSL\{str_entry, string_entry};
 use Flow\ETL\Exception\InvalidArgumentException;
-use Flow\ETL\{Config\ConfigBuilder, FlowContext, Row, Rows};
+use Flow\ETL\{Config\ConfigBuilder, FlowContext, Row, Rows, Tests\FlowTestCase};
 use Google\Service\Sheets;
 use Google\Service\Sheets\Resource\SpreadsheetsValues;
-use PHPUnit\Framework\TestCase;
 
-final class GoogleSheetExtractorTest extends TestCase
+final class GoogleSheetExtractorTest extends FlowTestCase
 {
     public function test_its_stop_fetching_data_if_processed_row_count_is_less_then_last_range_end_row() : void
     {
