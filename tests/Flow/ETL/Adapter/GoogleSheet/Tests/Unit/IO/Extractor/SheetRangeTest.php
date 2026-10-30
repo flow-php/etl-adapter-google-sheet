@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit;
+namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit\IO\Extractor;
 
-use Flow\ETL\Adapter\GoogleSheet\Columns;
-use Flow\ETL\Adapter\GoogleSheet\SheetRange;
-use Flow\ETL\Exception\InvalidArgumentException;
+use Flow\ETL\Adapter\GoogleSheet\IO\Extractor\Columns;
+use Flow\ETL\Adapter\GoogleSheet\IO\Extractor\SheetRange;
+use Flow\ETL\Foundation\Exception\InvalidArgumentException;
 use Flow\ETL\Tests\FlowTestCase;
 use Generator;
 use PHPUnit\Framework\Attributes\DataProvider;

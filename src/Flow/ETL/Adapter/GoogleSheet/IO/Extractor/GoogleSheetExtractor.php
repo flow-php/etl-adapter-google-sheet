@@ -2,48 +2,42 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet;
+namespace Flow\ETL\Adapter\GoogleSheet\IO\Extractor;
 
-use Flow\ETL\Cardinality;
-use Flow\ETL\Exception\InferredSchemaException;
-use Flow\ETL\Exception\InvalidArgumentException;
-use Flow\ETL\Extractor;
-use Flow\ETL\Extractor\BatchableExtractor;
-use Flow\ETL\Extractor\Batches;
-use Flow\ETL\Extractor\File\MetadataColumns;
-use Flow\ETL\Extractor\File\MetadataColumnsExtractor;
-use Flow\ETL\Extractor\InfersSchema;
-use Flow\ETL\Extractor\RewindableExtractor;
-use Flow\ETL\Extractor\Signal;
-use Flow\ETL\Extractor\Statistics;
-use Flow\ETL\FlowContext;
-use Flow\ETL\Rows;
-use Flow\ETL\Rows\RowsBuilder;
-use Flow\ETL\Schema;
-use Flow\ETL\Schema\Inference\SchemaInference;
-use Flow\ETL\Schema\Inference\SchemaInferenceBuilder;
-use Flow\ETL\Schema\Inference\SchemaInferrer;
+use Flow\ETL\Adapter\GoogleSheet\IO\Inference\GoogleSheetSniffer;
+use Flow\ETL\Foundation\Exception\InferredSchemaException;
+use Flow\ETL\Foundation\Exception\InvalidArgumentException;
+use Flow\ETL\IO\Extractor;
+use Flow\ETL\IO\Extractor\BatchableExtractor;
+use Flow\ETL\IO\Extractor\Criteria;
+use Flow\ETL\IO\Extractor\File\MetadataColumnsExtractor;
+use Flow\ETL\IO\Extractor\InfersSchema;
+use Flow\ETL\IO\Extractor\Signal;
+use Flow\ETL\IO\Extractor\Statistics;
+use Flow\ETL\IO\Inference\SchemaInference;
+use Flow\ETL\IO\Inference\SchemaInferenceBuilder;
+use Flow\ETL\IO\Inference\SchemaInferrer;
+use Flow\ETL\Values\BatchSize;
+use Flow\ETL\Values\Cardinality;
+use Flow\ETL\Values\Column\Backend;
+use Flow\ETL\Values\Rows;
+use Flow\ETL\Values\Rows\RowsBuilder;
+use Flow\ETL\Values\Schema;
+use Flow\ETL\Values\Schema\Definition\StringDefinition;
 use Generator;
 use Google\Service\Sheets;
 
 use function array_diff;
 use function array_keys;
 use function array_map;
-use function Flow\ETL\DSL\str_schema;
 use function sprintf;
 
 /**
  * @import-type GoogleSheetOptions from GoogleSheetReadOptions
  */
-final class GoogleSheetExtractor implements
-    BatchableExtractor,
-    Extractor,
-    InfersSchema,
-    MetadataColumnsExtractor,
-    RewindableExtractor
+final class GoogleSheetExtractor implements BatchableExtractor, Extractor, InfersSchema, MetadataColumnsExtractor
 {
-    use Batches;
-    use MetadataColumns;
+    private BatchSize $batchSize;
 
     /**
      * Core defaults to 20 480. A sheet range is an HTTP
@@ -51,6 +45,8 @@ final class GoogleSheetExtractor implements
      * ~20 000 rows - and the read then fetches it again.
      */
     private const int SAMPLE_ROWS = 100;
+
+    private bool $addMetadataColumns = false;
 
     private ?Schema $derivedSchema = null;
 
@@ -76,6 +72,15 @@ final class GoogleSheetExtractor implements
     ) {
         $this->inference = new SchemaInference(sampleSize: self::SAMPLE_ROWS);
         $this->readOptions = new GoogleSheetReadOptions();
+        $this->batchSize = new BatchSize();
+    }
+
+    /**
+     * @return int<1, max>
+     */
+    public function batchSize(): int
+    {
+        return $this->batchSize->size;
     }
 
     public function isRepeatable(): bool
@@ -86,32 +91,34 @@ final class GoogleSheetExtractor implements
     /**
      * @return Generator<int, Rows, Signal|null, void>
      */
-    public function extract(FlowContext $context, ?int $limit = null): Generator
+    public function extract(Backend $backend, Criteria $criteria): Generator
     {
         $reader = new GoogleSheetReader($this->service, $this->spreadsheetId, $this->columnRange, $this->readOptions);
-        $sampler = new GoogleSheetSampler($reader, $this->inference->sampleSize);
+        $sniffer = new GoogleSheetSniffer(
+            $reader,
+            $this->inference->sampleSize,
+            $this->readOptions->typer($this->inference->candidates()),
+        );
         // only THIS call's sample can serve the read; a memo hit means no rows were fetched here
         $sampledNow = $this->schema === null && $this->derivedSchema === null;
-        $base = $this->schema ?? ($this->derivedSchema ??= (new SchemaInferrer(
-            $this->inference,
-            $this->readOptions->typer($this->inference->candidates()),
-        ))->infer($sampler->header(), $sampler->samples($this->inference->sampleSize)));
+        $base = $this->schema ?? ($this->derivedSchema ??= (new SchemaInferrer($this->inference))->infer(
+            $sniffer,
+        )->schema);
 
         if ($sampledNow) {
-            $this->gridRowCount = $sampler->gridRowCount();
+            $this->gridRowCount = $sniffer->gridRowCount();
         }
 
         $schema = $this->addMetadataColumns
-            ? $base->add(str_schema('_spread_sheet_id'), str_schema('_sheet_name'))
+            ? $base->add(new StringDefinition('_spread_sheet_id'), new StringDefinition('_sheet_name'))
             : $base;
-        $backend = $context->backend();
         $checked = $this->schema !== null || $this->inference->unionByName;
 
         $batchSize = $this->batchSize();
         $yielded = 0;
         // the sample already holds every row when its range covered the grid, so the read is served from it rather
         // than fetching the same rows again; nothing can have diverged from a schema read off these very rows
-        $batches = ($sampledNow ? $sampler->batches($batchSize) : null) ?? $reader->batches(
+        $batches = ($sampledNow ? $sniffer->batches($batchSize) : null) ?? $reader->batches(
             $this->rowsPerPage,
             $batchSize,
         );
@@ -123,16 +130,17 @@ final class GoogleSheetExtractor implements
                 // a row that carries no columns is not a divergence: withHeader(false) decodes a leading blank
                 // row to one, and the names come from the row after it
                 if ($columns !== []) {
-                    $expected = $base->references()->names();
+                    $expected = $base->names();
 
                     if (array_diff($columns, $expected) !== [] || array_diff($expected, $columns) !== []) {
                         // a sheet is one source, so it is named as both the read and the inferred-from side
                         throw InferredSchemaException::columnsDiverge(
                             sprintf('spreadsheet "%s" sheet "%s"', $this->spreadsheetId, $this->columnRange->sheetName),
                             sprintf('spreadsheet "%s" sheet "%s"', $this->spreadsheetId, $this->columnRange->sheetName),
-                            $base,
+                            $expected,
                             $columns,
-                            $this->inference,
+                            $this->inference->sampleSize,
+                            $this->inference->filesToSniff,
                         );
                     }
 
@@ -165,7 +173,7 @@ final class GoogleSheetExtractor implements
                 return;
             }
 
-            if ($limit !== null && $yielded >= $limit) {
+            if ($criteria->limit !== null && $yielded >= $criteria->limit) {
                 return;
             }
         }
@@ -183,18 +191,18 @@ final class GoogleSheetExtractor implements
 
     public function schema(): Schema
     {
-        $sampler = new GoogleSheetSampler(
+        $sniffer = new GoogleSheetSniffer(
             new GoogleSheetReader($this->service, $this->spreadsheetId, $this->columnRange, $this->readOptions),
             $this->inference->sampleSize,
+            $this->readOptions->typer($this->inference->candidates()),
         );
         $sampledNow = $this->schema === null && $this->derivedSchema === null;
-        $base = $this->schema ?? ($this->derivedSchema ??= (new SchemaInferrer(
-            $this->inference,
-            $this->readOptions->typer($this->inference->candidates()),
-        ))->infer($sampler->header(), $sampler->samples($this->inference->sampleSize)));
+        $base = $this->schema ?? ($this->derivedSchema ??= (new SchemaInferrer($this->inference))->infer(
+            $sniffer,
+        )->schema);
 
         if ($sampledNow) {
-            $this->gridRowCount = $sampler->gridRowCount();
+            $this->gridRowCount = $sniffer->gridRowCount();
         }
 
         if ($this->schema === null && $base->count() === 0) {
@@ -206,7 +214,7 @@ final class GoogleSheetExtractor implements
         }
 
         return $this->addMetadataColumns
-            ? $base->add(str_schema('_spread_sheet_id'), str_schema('_sheet_name'))
+            ? $base->add(new StringDefinition('_spread_sheet_id'), new StringDefinition('_sheet_name'))
             : $base;
     }
 
@@ -222,6 +230,13 @@ final class GoogleSheetExtractor implements
         }
 
         return $this->statistics ??= new Statistics(rows: Cardinality::atMost($this->gridRowCount));
+    }
+
+    public function withBatchSize(int $batchSize): static
+    {
+        $this->batchSize = new BatchSize($batchSize);
+
+        return $this;
     }
 
     public function withDropExtraColumns(bool $dropExtraColumns): self
@@ -250,6 +265,13 @@ final class GoogleSheetExtractor implements
         $this->derivedSchema = null;
         $this->gridRowCount = null;
         $this->statistics = null;
+
+        return $this;
+    }
+
+    public function withMetadataColumns(bool $addMetadataColumns): static
+    {
+        $this->addMetadataColumns = $addMetadataColumns;
 
         return $this;
     }

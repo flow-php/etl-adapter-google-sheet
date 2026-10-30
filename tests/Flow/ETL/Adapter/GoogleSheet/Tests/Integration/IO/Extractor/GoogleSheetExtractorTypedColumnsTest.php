@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet\Tests\Integration;
+namespace Flow\ETL\Adapter\GoogleSheet\Tests\Integration\IO\Extractor;
 
-use Flow\ETL\Adapter\GoogleSheet\Tests\GoogleSheetsContext;
-use Flow\ETL\Config;
+use Flow\ETL\Adapter\GoogleSheet\Tests\Context\GoogleSheetsContext;
+use Flow\ETL\IO\Extractor\Criteria;
 use Flow\ETL\Tests\FlowTestCase;
 
 use function Flow\ETL\Adapter\GoogleSheet\from_google_sheet;
 use function Flow\ETL\DSL\bool_schema;
+use function Flow\ETL\DSL\config_builder;
 use function Flow\ETL\DSL\date_schema;
 use function Flow\ETL\DSL\float_schema;
 use function Flow\ETL\DSL\flow_context;
@@ -24,7 +25,7 @@ final class GoogleSheetExtractorTypedColumnsTest extends FlowTestCase
     public function test_appends_spread_sheet_id_and_sheet_name_to_the_schema_when_metadata_columns_are_enabled(): void
     {
         $extractor = from_google_sheet(
-            (new GoogleSheetsContext())->sheets(__DIR__ . '/../Fixtures/batch.json'),
+            (new GoogleSheetsContext())->sheets(__DIR__ . '/../../../Fixtures/batch.json'),
             '1234567890',
             'Sheet',
         )
@@ -33,7 +34,7 @@ final class GoogleSheetExtractorTypedColumnsTest extends FlowTestCase
 
         $rows = [];
 
-        foreach ($extractor->extract(flow_context(Config::builder()->build())) as $batch) {
+        foreach ($extractor->extract(flow_context(config_builder()->build())->backend(), new Criteria()) as $batch) {
             foreach ($batch->toArray() as $row) {
                 $rows[] = $row;
             }
@@ -51,9 +52,9 @@ final class GoogleSheetExtractorTypedColumnsTest extends FlowTestCase
     {
         $extractor = from_google_sheet(
             (new GoogleSheetsContext())->sheetsOfGrid(
-                __DIR__ . '/../Fixtures/spreadsheet-large-grid.json',
-                __DIR__ . '/../Fixtures/sample-typed.json',
-                __DIR__ . '/../Fixtures/batch-typed.json',
+                __DIR__ . '/../../../Fixtures/spreadsheet-large-grid.json',
+                __DIR__ . '/../../../Fixtures/sample-typed.json',
+                __DIR__ . '/../../../Fixtures/batch-typed.json',
             ),
             '1234567890',
             'Sheet',
@@ -61,7 +62,7 @@ final class GoogleSheetExtractorTypedColumnsTest extends FlowTestCase
 
         $rows = [];
 
-        foreach ($extractor->extract(flow_context(Config::builder()->build())) as $batch) {
+        foreach ($extractor->extract(flow_context(config_builder()->build())->backend(), new Criteria()) as $batch) {
             static::assertTrue(
                 $batch
                     ->schema()

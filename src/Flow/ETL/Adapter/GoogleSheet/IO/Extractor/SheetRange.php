@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet;
+namespace Flow\ETL\Adapter\GoogleSheet\IO\Extractor;
 
-use Flow\ETL\Exception\InvalidArgumentException;
+use Flow\ETL\Foundation\Exception\InvalidArgumentException;
 
 use function sprintf;
 

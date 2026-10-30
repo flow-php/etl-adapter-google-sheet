@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet;
+namespace Flow\ETL\Adapter\GoogleSheet\IO\Extractor;
 
+use Flow\ETL\Adapter\GoogleSheet\IO\Inference\GoogleSheetSample;
 use Generator;
 use Google\Service\Sheets;
 

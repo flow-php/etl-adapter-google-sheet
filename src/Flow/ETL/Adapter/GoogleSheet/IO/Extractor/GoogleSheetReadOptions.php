@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet;
+namespace Flow\ETL\Adapter\GoogleSheet\IO\Extractor;
 
-use Flow\ETL\Extractor\Grid\RecordDecoder;
-use Flow\ETL\Schema\Inference\InferredTypes;
+use Flow\ETL\IO\Extractor\Grid\RecordDecoder;
+use Flow\ETL\IO\Inference\InferredTypes;
 use Flow\Types\Type\Logical\InstanceOfTypeNarrower;
 use Flow\Types\Type\Native\String\StringTypeNarrower;
 use Flow\Types\Type\TypeNarrower;

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit;
+namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit\IO\Extractor;
 
-use Flow\ETL\Adapter\GoogleSheet\GoogleSheetReadOptions;
-use Flow\ETL\Exception\InvalidArgumentException;
-use Flow\ETL\Schema\Inference\InferredTypes;
+use Flow\ETL\Adapter\GoogleSheet\IO\Extractor\GoogleSheetReadOptions;
+use Flow\ETL\Foundation\Exception\InvalidArgumentException;
+use Flow\ETL\IO\Inference\InferredTypes;
 use Flow\ETL\Tests\FlowTestCase;
 use Flow\Types\Type\Logical\InstanceOfTypeNarrower;
 use Flow\Types\Type\Native\String\StringTypeNarrower;

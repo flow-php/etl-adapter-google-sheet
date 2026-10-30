@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet;
+namespace Flow\ETL\Adapter\GoogleSheet\IO\Inference;
 
 final readonly class GoogleSheetSample
 {

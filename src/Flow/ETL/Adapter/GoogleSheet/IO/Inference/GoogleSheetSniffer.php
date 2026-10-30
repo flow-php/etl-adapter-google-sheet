@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet;
+namespace Flow\ETL\Adapter\GoogleSheet\IO\Inference;
 
-use Flow\ETL\Schema\Inference\SchemaSampler;
+use Flow\ETL\Adapter\GoogleSheet\IO\Extractor\GoogleSheetReader;
+use Flow\ETL\IO\Inference\ColumnTypes;
+use Flow\ETL\IO\Inference\Sample;
+use Flow\ETL\IO\Inference\Sniffer;
+use Flow\Types\Type\TypeNarrower;
 use Generator;
 
 use function count;
 
-final class GoogleSheetSampler implements SchemaSampler
+final class GoogleSheetSniffer implements Sniffer
 {
     private ?GoogleSheetSample $sample = null;
 
@@ -19,6 +23,7 @@ final class GoogleSheetSampler implements SchemaSampler
     public function __construct(
         private readonly GoogleSheetReader $reader,
         private readonly int $rowBudget,
+        private readonly TypeNarrower $typer,
     ) {}
 
     /**
@@ -53,6 +58,13 @@ final class GoogleSheetSampler implements SchemaSampler
         })();
     }
 
+    public function bytes(int $unit): int
+    {
+        return 0;
+    }
+
+    public function close(): void {}
+
     public function gridRowCount(): int
     {
         return $this->sample()->gridRowCount;
@@ -68,20 +80,33 @@ final class GoogleSheetSampler implements SchemaSampler
 
     public function sample(): GoogleSheetSample
     {
-        // one range is one HTTP round trip, and header() and samples() both need it
+        // one range is one HTTP round trip, and header() and sniff() both need it
         return $this->sample ??= $this->reader->sample($this->rowBudget);
     }
 
-    /**
-     * $rowBudget is deliberately unused: the budget sized the single range when this sampler was constructed,
-     * and sample() is memoised, so advancing further cannot fetch more.
-     *
-     * @return Generator<int, Generator<int, array<array-key, mixed>>>
-     */
-    public function samples(int $rowBudget): iterable
+    public function names(): array
     {
-        yield (function (): Generator {
-            yield from $this->sample()->rows;
-        })();
+        return $this->header();
+    }
+
+    /**
+     * The budget sized the single range when this sniffer was constructed, and sample() is memoised, so a sniff
+     * folds rows already fetched.
+     */
+    public function sniff(int $unit, int $rowBudget): Sample
+    {
+        $columnTypes = ColumnTypes::sniff($this->names(), $this->sample()->rows, $rowBudget, $this->typer);
+
+        return new Sample($columnTypes->folded(), 0, $rowBudget === -1 || $columnTypes->rows() < $rowBudget);
+    }
+
+    public function parts(int $unit, int $targetBytes): array
+    {
+        return [$this];
+    }
+
+    public function units(): int
+    {
+        return 1;
     }
 }

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit;
+namespace Flow\ETL\Adapter\GoogleSheet\Tests\Unit\IO\Inference;
 
-use Flow\ETL\Adapter\GoogleSheet\GoogleSheetSample;
+use Flow\ETL\Adapter\GoogleSheet\IO\Inference\GoogleSheetSample;
 use Flow\ETL\Tests\FlowTestCase;
 
 final class GoogleSheetSampleTest extends FlowTestCase

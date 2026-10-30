@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet\Tests\Integration;
+namespace Flow\ETL\Adapter\GoogleSheet\Tests\Integration\IO\Extractor;
 
-use Flow\ETL\Adapter\GoogleSheet\Tests\GoogleSheetsContext;
-use Flow\ETL\Exception\InferredSchemaException;
-use Flow\ETL\Exception\InvalidArgumentException;
-use Flow\ETL\Exception\SchemaMismatchException;
-use Flow\ETL\Rows;
+use Flow\ETL\Adapter\GoogleSheet\Tests\Context\GoogleSheetsContext;
+use Flow\ETL\Foundation\Exception\InferredSchemaException;
+use Flow\ETL\Foundation\Exception\InvalidArgumentException;
+use Flow\ETL\Foundation\Exception\SchemaMismatchException;
+use Flow\ETL\IO\Extractor\Criteria;
 use Flow\ETL\Tests\FlowTestCase;
+use Flow\ETL\Values\Rows;
 
 use function array_map;
 use function Flow\ETL\Adapter\GoogleSheet\from_google_sheet;
@@ -39,10 +40,10 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     public function test_extract_expand_missing_columns(): void
     {
         $rows = df()
-            ->extract(from_google_sheet(
+            ->read(from_google_sheet(
                 $this->context->sheets(
-                    __DIR__ . '/../Fixtures/sample-missing-columns.json',
-                    __DIR__ . '/../Fixtures/missing-columns.json',
+                    __DIR__ . '/../../../Fixtures/sample-missing-columns.json',
+                    __DIR__ . '/../../../Fixtures/missing-columns.json',
                 ),
                 '1234567890',
                 'Sheet',
@@ -60,8 +61,8 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     public function test_extract_puts_null_in_a_declared_nullable_column_the_sheet_lacks(): void
     {
         $rows = df()
-            ->extract(from_google_sheet(
-                $this->context->sheets(__DIR__ . '/../Fixtures/extra-empty-rows.json'),
+            ->read(from_google_sheet(
+                $this->context->sheets(__DIR__ . '/../../../Fixtures/extra-empty-rows.json'),
                 '1234567890',
                 'Sheet',
             )->withSchema(schema(
@@ -91,8 +92,8 @@ final class GoogleSheetExtractorTest extends FlowTestCase
         $this->expectExceptionMessage('column "id" (row 0) declared by the schema is missing from the row');
 
         df()
-            ->extract(from_google_sheet(
-                $this->context->sheets(__DIR__ . '/../Fixtures/extra-empty-rows.json'),
+            ->read(from_google_sheet(
+                $this->context->sheets(__DIR__ . '/../../../Fixtures/extra-empty-rows.json'),
                 '1234567890',
                 'Sheet',
             )->withSchema(schema(string_schema('Header 1'), string_schema('Header 2'), int_schema('id'))))
@@ -102,10 +103,10 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     public function test_extract_skip_extra_empty_rows(): void
     {
         $rows = df()
-            ->extract(from_google_sheet(
+            ->read(from_google_sheet(
                 $this->context->sheets(
-                    __DIR__ . '/../Fixtures/sample-extra-empty-rows.json',
-                    __DIR__ . '/../Fixtures/extra-empty-rows.json',
+                    __DIR__ . '/../../../Fixtures/sample-extra-empty-rows.json',
+                    __DIR__ . '/../../../Fixtures/extra-empty-rows.json',
                 ),
                 '1234567890',
                 'Sheet',
@@ -123,50 +124,56 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     public function test_extract_with_batches(): void
     {
         $extractor = from_google_sheet(
-            $this->context->sheets(__DIR__ . '/../Fixtures/sample-batch.json', __DIR__ . '/../Fixtures/batch.json'),
-            '1234567890',
-            'Sheet',
-        );
-        $extractor->withRowsPerPage(10);
-
-        static::assertCount(19, df()->extract($extractor)->fetch()->toArray());
-    }
-
-    public function test_extract_with_batches_containing_empty_rows(): void
-    {
-        $extractor = from_google_sheet(
             $this->context->sheets(
-                __DIR__ . '/../Fixtures/sample-batch-empty-rows.json',
-                __DIR__ . '/../Fixtures/batch-empty-rows.json',
+                __DIR__ . '/../../../Fixtures/sample-batch.json',
+                __DIR__ . '/../../../Fixtures/batch.json',
             ),
             '1234567890',
             'Sheet',
         );
         $extractor->withRowsPerPage(10);
 
-        static::assertCount(9, df()->extract($extractor)->fetch()->toArray());
+        static::assertCount(19, df()->read($extractor)->fetch()->toArray());
+    }
+
+    public function test_extract_with_batches_containing_empty_rows(): void
+    {
+        $extractor = from_google_sheet(
+            $this->context->sheets(
+                __DIR__ . '/../../../Fixtures/sample-batch-empty-rows.json',
+                __DIR__ . '/../../../Fixtures/batch-empty-rows.json',
+            ),
+            '1234567890',
+            'Sheet',
+        );
+        $extractor->withRowsPerPage(10);
+
+        static::assertCount(9, df()->read($extractor)->fetch()->toArray());
     }
 
     public function test_extract_with_batches_without_header(): void
     {
         $extractor = from_google_sheet(
-            $this->context->sheets(__DIR__ . '/../Fixtures/sample-batch.json', __DIR__ . '/../Fixtures/batch.json'),
+            $this->context->sheets(
+                __DIR__ . '/../../../Fixtures/sample-batch.json',
+                __DIR__ . '/../../../Fixtures/batch.json',
+            ),
             '1234567890',
             'Sheet',
         );
         $extractor->withRowsPerPage(10);
         $extractor->withHeader(false);
 
-        static::assertCount(20, df()->extract($extractor)->fetch()->toArray());
+        static::assertCount(20, df()->read($extractor)->fetch()->toArray());
     }
 
     public function test_extract_with_cut_extra_columns(): void
     {
         $rows = df()
-            ->extract(from_google_sheet(
+            ->read(from_google_sheet(
                 $this->context->sheets(
-                    __DIR__ . '/../Fixtures/sample-extra-columns.json',
-                    __DIR__ . '/../Fixtures/extra-columns.json',
+                    __DIR__ . '/../../../Fixtures/sample-extra-columns.json',
+                    __DIR__ . '/../../../Fixtures/extra-columns.json',
                 ),
                 '1234567890',
                 'Sheet',
@@ -185,8 +192,8 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     {
         $extractor = from_google_sheet(
             $this->context->sheets(
-                __DIR__ . '/../Fixtures/sample-extra-columns.json',
-                __DIR__ . '/../Fixtures/extra-columns.json',
+                __DIR__ . '/../../../Fixtures/sample-extra-columns.json',
+                __DIR__ . '/../../../Fixtures/extra-columns.json',
             ),
             '1234567890',
             'Sheet',
@@ -202,10 +209,10 @@ final class GoogleSheetExtractorTest extends FlowTestCase
         $this->expectExceptionMessage('Row has more columns (4) than headers (3)');
 
         df()
-            ->extract(from_google_sheet(
+            ->read(from_google_sheet(
                 $this->context->sheets(
-                    __DIR__ . '/../Fixtures/sample-extra-columns.json',
-                    __DIR__ . '/../Fixtures/extra-columns.json',
+                    __DIR__ . '/../../../Fixtures/sample-extra-columns.json',
+                    __DIR__ . '/../../../Fixtures/extra-columns.json',
                 ),
                 '1234567890',
                 'Sheet',
@@ -216,14 +223,12 @@ final class GoogleSheetExtractorTest extends FlowTestCase
 
     public function test_schema_is_inferred_before_any_row_is_read(): void
     {
-        $extractor = from_google_sheet(
-            $this->context->sheets(__DIR__ . '/../Fixtures/sample-typed.json'),
-            '1234567890',
-            'Sheet',
-        );
-
         static::assertTrue(
-            $extractor
+            from_google_sheet(
+                $this->context->sheets(__DIR__ . '/../../../Fixtures/sample-typed.json'),
+                '1234567890',
+                'Sheet',
+            )
                 ->schema()
                 ->isSame(schema(
                     int_schema('id', true),
@@ -243,16 +248,16 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     {
         $extractor = from_google_sheet(
             $this->context->sheetsOfGrid(
-                __DIR__ . '/../Fixtures/spreadsheet-large-grid.json',
-                __DIR__ . '/../Fixtures/sample-typed.json',
-                __DIR__ . '/../Fixtures/batch-typed.json',
+                __DIR__ . '/../../../Fixtures/spreadsheet-large-grid.json',
+                __DIR__ . '/../../../Fixtures/sample-typed.json',
+                __DIR__ . '/../../../Fixtures/batch-typed.json',
             ),
             '1234567890',
             'Sheet',
         );
 
         /** @var array<Rows> $batches */
-        $batches = iterator_to_array($extractor->withBatchSize(1)->extract(flow_context()));
+        $batches = iterator_to_array($extractor->withBatchSize(1)->extract(flow_context()->backend(), new Criteria()));
 
         static::assertSame([1, 1, 1], array_map(static fn(Rows $rows): int => $rows->count(), $batches));
 
@@ -271,29 +276,29 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     {
         $extractor = from_google_sheet(
             $this->context->sheets(
-                __DIR__ . '/../Fixtures/sample-header-only.json',
-                __DIR__ . '/../Fixtures/batch-header-only.json',
+                __DIR__ . '/../../../Fixtures/sample-header-only.json',
+                __DIR__ . '/../../../Fixtures/batch-header-only.json',
             ),
             '1234567890',
             'Sheet',
         );
 
         static::assertTrue($extractor->schema()->isSame(schema(str_schema('id', true), str_schema('price', true))));
-        static::assertCount(0, df()->extract($extractor)->fetch());
+        static::assertCount(0, df()->read($extractor)->fetch());
     }
 
     public function test_an_empty_sheet_refuses_to_infer_a_schema_and_extracts_nothing(): void
     {
         $extractor = from_google_sheet(
             $this->context->sheets(
-                __DIR__ . '/../Fixtures/sample-empty.json',
-                __DIR__ . '/../Fixtures/batch-empty.json',
+                __DIR__ . '/../../../Fixtures/sample-empty.json',
+                __DIR__ . '/../../../Fixtures/batch-empty.json',
             ),
             '1234567890',
             'Sheet',
         );
 
-        static::assertCount(0, iterator_to_array($extractor->extract(flow_context())));
+        static::assertCount(0, iterator_to_array($extractor->extract(flow_context()->backend(), new Criteria())));
 
         $this->expectException(InferredSchemaException::class);
         $this->expectExceptionMessage(
@@ -308,8 +313,8 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     {
         $extractor = from_google_sheet(
             $this->context->sheets(
-                __DIR__ . '/../Fixtures/sample-unformatted.json',
-                __DIR__ . '/../Fixtures/batch-unformatted.json',
+                __DIR__ . '/../../../Fixtures/sample-unformatted.json',
+                __DIR__ . '/../../../Fixtures/batch-unformatted.json',
             ),
             '1234567890',
             'Sheet',
@@ -327,7 +332,7 @@ final class GoogleSheetExtractorTest extends FlowTestCase
                 )),
         );
 
-        df()->extract($extractor)->fetch();
+        df()->read($extractor)->fetch();
 
         foreach ([1, 3] as $valuesRequest) {
             static::assertTrue(str_contains(
@@ -343,11 +348,11 @@ final class GoogleSheetExtractorTest extends FlowTestCase
         $this->expectExceptionMessageMatches('/unexpected \[comment\], missing \[note\]/');
 
         df()
-            ->extract(from_google_sheet(
+            ->read(from_google_sheet(
                 $this->context->sheetsOfGrid(
-                    __DIR__ . '/../Fixtures/spreadsheet-large-grid.json',
-                    __DIR__ . '/../Fixtures/sample-typed.json',
-                    __DIR__ . '/../Fixtures/batch-typed-diverging.json',
+                    __DIR__ . '/../../../Fixtures/spreadsheet-large-grid.json',
+                    __DIR__ . '/../../../Fixtures/sample-typed.json',
+                    __DIR__ . '/../../../Fixtures/batch-typed-diverging.json',
                 ),
                 '1234567890',
                 'Sheet',
@@ -362,11 +367,11 @@ final class GoogleSheetExtractorTest extends FlowTestCase
         $this->expectExceptionMessageMatches('/row 3/');
 
         df()
-            ->extract(from_google_sheet(
+            ->read(from_google_sheet(
                 $this->context->sheetsOfGrid(
-                    __DIR__ . '/../Fixtures/spreadsheet-large-grid.json',
-                    __DIR__ . '/../Fixtures/sample-typed.json',
-                    __DIR__ . '/../Fixtures/batch-typed-misfit.json',
+                    __DIR__ . '/../../../Fixtures/spreadsheet-large-grid.json',
+                    __DIR__ . '/../../../Fixtures/sample-typed.json',
+                    __DIR__ . '/../../../Fixtures/batch-typed-misfit.json',
                 ),
                 '1234567890',
                 'Sheet',
@@ -378,9 +383,9 @@ final class GoogleSheetExtractorTest extends FlowTestCase
     {
         $extractor = from_google_sheet(
             $this->context->sheetsOfGrid(
-                __DIR__ . '/../Fixtures/spreadsheet-large-grid.json',
-                __DIR__ . '/../Fixtures/sample-typed.json',
-                __DIR__ . '/../Fixtures/batch-typed.json',
+                __DIR__ . '/../../../Fixtures/spreadsheet-large-grid.json',
+                __DIR__ . '/../../../Fixtures/sample-typed.json',
+                __DIR__ . '/../../../Fixtures/batch-typed.json',
             ),
             '1234567890',
             'Sheet',

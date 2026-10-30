@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flow\ETL\Adapter\GoogleSheet\Tests;
+namespace Flow\ETL\Adapter\GoogleSheet\Tests\Context;
 
 use ArrayObject;
 use Google\Client as GoogleClient;
@@ -48,7 +48,7 @@ final readonly class GoogleSheetsContext
      */
     public function sheets(string ...$fixtureFiles): Sheets
     {
-        return $this->sheetsOfGrid(__DIR__ . '/Fixtures/spreadsheet.json', ...$fixtureFiles);
+        return $this->sheetsOfGrid(__DIR__ . '/../Fixtures/spreadsheet.json', ...$fixtureFiles);
     }
 
     /**
